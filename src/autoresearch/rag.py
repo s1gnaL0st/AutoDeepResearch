@@ -97,10 +97,11 @@ class RAGIndex:
 
 
 class PostgresRAGStore:
-    """Persist chunks in PostgreSQL; uses JSONB vectors until pgvector exists.
+    """Persist chunks in PostgreSQL with pgvector and FTS hybrid retrieval.
 
-    When the `vector` extension is installed, callers may migrate the JSONB
-    column to `vector(n)` and add an HNSW index without changing the API.
+    JSONB keeps an explicit portable fallback for developer machines where the
+    PostgreSQL server extension is not installed. Once pgvector is present,
+    this class creates a `vector(256)` column and HNSW cosine index itself.
     """
 
     def __init__(self, dsn: str, embedder: Callable[[str], list[float]] | None = None):
@@ -109,10 +110,22 @@ class PostgresRAGStore:
         self.dsn = dsn
         self.embedder = embedder or HashingEmbedder()
         with self.psycopg.connect(dsn) as conn:
-            self.vector_available = bool(conn.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname='vector')").fetchone()[0])
-            self.backend = "pgvector" if self.vector_available else "postgres_jsonb_compat"
+            installed = bool(conn.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname='vector')").fetchone()[0])
+            available = bool(conn.execute("SELECT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name='vector')").fetchone()[0])
+            if available and not installed:
+                conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+                installed = True
+            self.vector_available = installed
+            self.backend = "pgvector" if installed else "postgres_jsonb_compat"
             conn.execute("CREATE TABLE IF NOT EXISTS autoresearch_rag_chunks (chunk_id TEXT PRIMARY KEY, document_id TEXT NOT NULL, text TEXT NOT NULL, locator JSONB NOT NULL, embedding JSONB NOT NULL, metadata JSONB NOT NULL DEFAULT '{}'::jsonb)")
             conn.execute("CREATE INDEX IF NOT EXISTS autoresearch_rag_chunks_document_idx ON autoresearch_rag_chunks(document_id)")
+            if installed:
+                conn.execute("ALTER TABLE autoresearch_rag_chunks ADD COLUMN IF NOT EXISTS embedding_vector vector(256)")
+                conn.execute("CREATE INDEX IF NOT EXISTS autoresearch_rag_chunks_hnsw_idx ON autoresearch_rag_chunks USING hnsw (embedding_vector vector_cosine_ops)")
+
+    @staticmethod
+    def _vector_literal(vector: list[float]) -> str:
+        return "[" + ",".join(f"{item:.9g}" for item in vector) + "]"
 
     def index_documents(self, documents: Iterable[dict[str, Any]]) -> int:
         index = RAGIndex(self.embedder)
@@ -120,10 +133,29 @@ class PostgresRAGStore:
             index.add_document(str(document.get("document_id")), str(document.get("text", "")), document.get("locator"), document.get("metadata"))
         with self.psycopg.connect(self.dsn) as conn:
             for row in index.rows:
-                conn.execute("INSERT INTO autoresearch_rag_chunks (chunk_id,document_id,text,locator,embedding,metadata) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (chunk_id) DO NOTHING", (row["chunk_id"], row["document_id"], row["text"], self.psycopg.types.json.Json(row["locator"]), self.psycopg.types.json.Json(row["embedding"]), self.psycopg.types.json.Json(row["metadata"])))
+                if self.vector_available:
+                    conn.execute("INSERT INTO autoresearch_rag_chunks (chunk_id,document_id,text,locator,embedding,metadata,embedding_vector) VALUES (%s,%s,%s,%s,%s,%s,%s::vector) ON CONFLICT (chunk_id) DO NOTHING", (row["chunk_id"], row["document_id"], row["text"], self.psycopg.types.json.Json(row["locator"]), self.psycopg.types.json.Json(row["embedding"]), self.psycopg.types.json.Json(row["metadata"]), self._vector_literal(row["embedding"])))
+                else:
+                    conn.execute("INSERT INTO autoresearch_rag_chunks (chunk_id,document_id,text,locator,embedding,metadata) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (chunk_id) DO NOTHING", (row["chunk_id"], row["document_id"], row["text"], self.psycopg.types.json.Json(row["locator"]), self.psycopg.types.json.Json(row["embedding"]), self.psycopg.types.json.Json(row["metadata"])))
         return len(index.rows)
 
     def search(self, query: str, top_k: int = 8) -> list[RetrievedChunk]:
+        if self.vector_available:
+            vector = self._vector_literal(self.embedder(query))
+            with self.psycopg.connect(self.dsn) as conn:
+                rows = conn.execute("""
+                    WITH scored AS (
+                      SELECT chunk_id, document_id, text, locator,
+                        1 - (embedding_vector <=> %s::vector) AS vector_score,
+                        ts_rank_cd(to_tsvector('simple', text), websearch_to_tsquery('simple', %s)) AS lexical_score
+                      FROM autoresearch_rag_chunks
+                      WHERE embedding_vector IS NOT NULL
+                    )
+                    SELECT chunk_id, document_id, text, locator, vector_score, lexical_score,
+                      0.7 * vector_score + 0.3 * lexical_score AS score
+                    FROM scored ORDER BY score DESC, chunk_id ASC LIMIT %s
+                """, (vector, query, top_k)).fetchall()
+            return [RetrievedChunk(row[0], row[1], row[2], row[3], float(row[6]), float(row[5]), float(row[4])) for row in rows]
         index = RAGIndex(self.embedder)
         with self.psycopg.connect(self.dsn) as conn:
             rows = conn.execute("SELECT chunk_id,document_id,text,locator,embedding,metadata FROM autoresearch_rag_chunks").fetchall()

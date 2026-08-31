@@ -1422,3 +1422,13 @@ project can be resumed without relying on chat history.
   extension is supplied.
 - Verification: PostgreSQL RAG indexing and hybrid retrieval smoke test passed;
   project test suite remains green (`90 passed`).
+
+## 2026-08-31 - Native pgvector integration path
+
+- Change: `PostgresRAGStore` now auto-creates the `vector` extension when
+  available, adds an HNSW cosine index over `vector(256)`, and runs hybrid
+  pgvector + PostgreSQL FTS queries. It falls back explicitly to JSONB/in-memory
+  retrieval when the server extension is unavailable.
+- Build: pgvector 0.8.6 compiled successfully with the D: drive MSVC toolchain;
+  copying into the protected PostgreSQL installation requires an administrator
+  UAC approval and was not completed in this session.
