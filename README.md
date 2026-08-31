@@ -1,4 +1,4 @@
-# AutoResearch
+# AutoDeepResearch
 
 ![AutoDeepResearch console](docs/assets/research-console.png)
 
