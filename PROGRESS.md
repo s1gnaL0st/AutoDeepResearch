@@ -1453,6 +1453,8 @@ project can be resumed without relying on chat history.
 - Documentation: Added PostgreSQL/pgvector and embedding setup notes to the
   README. Changes are pushed to `origin/main` at `a47dae3`.
 - Environment: Administrator installation of the already-built pgvector files
-  into `D:\PostgreSQL` did not complete; `vector.dll` and `vector.control` are
-  still absent and the live backend correctly reports `postgres_jsonb_compat`.
-  No installation path on C: was used.
+  into `D:\PostgreSQL` initially did not complete. A subsequent explicit
+  administrator copy succeeded: PostgreSQL now exposes pgvector 0.8.6, the
+  extension is enabled in `autoresearch`, and the live backend reports
+  `pgvector`. A write/search smoke test passed and its temporary row was
+  removed. No installation path on C: was used.
