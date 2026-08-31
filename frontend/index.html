@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <title>AutoResearch — Autonomous Science Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">✳</span><span>AutoResearch</span><sup>OS</sup></div>
+        <div class="eyebrow">WORKSPACE</div>
+        <nav>
+          <button class="nav-item active" data-view="overview"><span>◈</span> Overview</button>
+          <button class="nav-item" data-view="evidence"><span>⌁</span> Evidence graph</button>
+          <button class="nav-item" data-view="experiments"><span>◎</span> Experiments</button>
+          <button class="nav-item" data-view="manuscript"><span>▤</span> Manuscript</button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="connection"><i></i><div><strong>LOCAL RUNTIME</strong><small>API · 127.0.0.1:8090</small></div></div>
+          <button class="settings" id="apiSettings">⚙ <span>Connection</span></button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar"><div class="crumb">RESEARCH CONSOLE <span>/</span> <b id="viewName">OVERVIEW</b></div><div class="top-actions"><span class="pulse-label"><i></i> SYSTEM READY</span><button class="theme-switch" id="themeToggle" type="button" role="switch" aria-checked="false" aria-label="切换浅色主题"><span class="theme-icon">☼</span><span class="switch-track"><span class="switch-thumb"></span></span></button><button class="icon-btn" title="Refresh" id="refreshBtn">↻</button></div></header>
+        <section class="content" id="overviewView">
+          <div class="hero"><div><div class="eyebrow">AUTONOMOUS SCIENTIFIC DISCOVERY</div><h1>Turn a question<br /><em>into evidence.</em></h1><p class="hero-copy">A research operating system for literature, hypotheses, experiments and publication-ready reasoning.</p></div><div class="hero-orbit"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="orbit-core">AR<span>·</span>01</div></div></div>
+          <div class="command-card"><div class="command-head"><span class="status-dot"></span><span>NEW RESEARCH MISSION</span><span class="mono hint">ENTER A QUESTION TO INITIALIZE</span></div><textarea id="question" placeholder="e.g. Can an RBF kernel improve handwritten digit recognition under a fixed compute budget?" rows="2"></textarea><div class="command-foot"><div class="chips"><button class="chip active" data-mode="fixture">Fixture literature</button><button class="chip" data-mode="deerflow">DeerFlow</button><button class="chip" data-mode="live">Live metadata</button></div><div class="mission-controls"><label>ITER <input id="iterations" type="number" min="1" max="20" value="2" /></label><label>REPS <input id="replicates" type="number" min="1" max="20" value="2" /></label><button class="launch" id="launchBtn">Launch mission <span>↗</span></button></div></div><details class="runtime-config"><summary><span>⚙</span> REAL RUNTIME CONFIG <small>Codex / DeerFlow / experiment runner</small></summary><div class="config-grid"><label>CODING AGENT<select id="codingAgent"><option value="fake">Demo / Fake</option><option value="codex">Codex CLI</option><option value="claude">Claude Code CLI</option><option value="command">Custom command</option></select></label><label>CODING WORKSPACE<input id="codingCwd" placeholder="F:\\your-experiment-repo" /></label><label class="wide">EXPERIMENT COMMAND<input id="computeCommand" placeholder="python experiment.py" /></label><label>EXPERIMENT WORKSPACE<input id="computeCwd" placeholder="F:\\your-experiment-repo" /></label><label>CODEX EXECUTABLE<input id="codexExecutable" value="codex" /></label><label>CLAUDE EXECUTABLE<input id="claudeExecutable" value="claude" /></label></div><p class="config-note">真实 CLI 的 API Key 不在这里填写，只从本机环境变量读取。实验命令必须输出 <code>{"metrics":{"score":0.91}}</code>。</p></details></div>
+          <div class="section-heading"><div><div class="eyebrow">ACTIVE THREADS</div><h2>Research missions</h2></div><span class="count" id="missionCount">00</span></div>
+          <div id="missions" class="missions"><div class="empty-state">No missions yet. Your next discovery starts above.</div></div>
+        </section>
+        <section class="content hidden" id="detailView"><button class="back" id="backBtn">← All missions</button><div class="detail-head"><div><div class="eyebrow" id="detailState">MISSION</div><h1 id="detailTitle">Research mission</h1><p class="mono" id="detailId"></p></div><div class="detail-actions"><button class="report-btn hidden" id="reportBtn">OPEN REPORT <span>↗</span></button><span class="state-pill" id="detailPill">DRAFT</span></div></div><div class="detail-meta" id="detailMeta"></div><div class="pipeline" id="pipeline"></div><div class="detail-grid"><div class="panel artifact-panel"><div class="panel-title"><span>ARTIFACT STREAM</span><span class="mono" id="artifactCount">0 ITEMS</span></div><div id="artifacts" class="artifact-list"></div></div><div class="panel insight-panel"><div class="panel-title">MISSION SIGNAL</div><div id="insight" class="insight"><div class="signal-ring">◎</div><p>Select an artifact to inspect its evidence trail.</p></div></div></div></section>
+      </main>
+    </div>
+    <div class="toast" id="toast"></div>
+    <script src="./app.js?v=20260831b"></script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+.autoresearch/
+.autoresearch-*/
+.deerflow-runtime/
+.final-smoke*/
+.progress-smoke/
+.live-check/
+.mvp1-check/
+.compute-check/
+.package-check/
+.e2e-final/
+.smoke-check*/
+.tmp-autoresearch/
+third_party/
+__pycache__/
+*.py[cod]
+.pytest_cache/
