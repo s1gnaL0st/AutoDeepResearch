@@ -109,7 +109,7 @@ class PostgresRAGStore:
         self.dsn = dsn
         self.embedder = embedder or HashingEmbedder()
         with self.psycopg.connect(dsn) as conn:
-            self.vector_available = bool(conn.execute("SELECT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name='vector')").fetchone()[0])
+            self.vector_available = bool(conn.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname='vector')").fetchone()[0])
             self.backend = "pgvector" if self.vector_available else "postgres_jsonb_compat"
             conn.execute("CREATE TABLE IF NOT EXISTS autoresearch_rag_chunks (chunk_id TEXT PRIMARY KEY, document_id TEXT NOT NULL, text TEXT NOT NULL, locator JSONB NOT NULL, embedding JSONB NOT NULL, metadata JSONB NOT NULL DEFAULT '{}'::jsonb)")
             conn.execute("CREATE INDEX IF NOT EXISTS autoresearch_rag_chunks_document_idx ON autoresearch_rag_chunks(document_id)")
