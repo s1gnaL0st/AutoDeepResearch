@@ -11,7 +11,7 @@ from .models import Artifact, ResearchTask
 from .protocol import A2AMessage
 from .literature import FixtureLiteratureSource, LiteratureSource, candidate_passages, deduplicate
 from .fulltext import extract_local_full_text
-from .rag import PostgresRAGStore, RAGIndex
+from .rag import PostgresRAGStore, RAGIndex, configured_embedder
 
 
 class FakeLiteratureAgent:
@@ -71,23 +71,24 @@ class LiteratureAgent:
             "metadata": {"source": passage.get("source"), "source_url": passage.get("source_url"), "passage_id": passage.get("passage_id")},
         } for passage in fulltext_passages if isinstance(passage.get("text"), str) and passage["text"].strip()]
         rag_backend = "in_memory"
+        embedder, embedding_model, embedding_error = configured_embedder()
         if rag_documents:
             dsn = os.environ.get("AUTORESEARCH_DATABASE_URL")
             if dsn:
                 try:
-                    rag = PostgresRAGStore(dsn)
+                    rag = PostgresRAGStore(dsn, embedder=embedder)
                     indexed = rag.index_documents(rag_documents)
                     retrieved = rag.search(task.question)
                     rag_backend = "postgres_pgvector_ready" if getattr(rag, "vector_available", False) else "postgres_jsonb_compat"
                 except Exception as exc:
                     # Retrieval must not make an otherwise valid literature
                     # result fail; preserve the exact fallback reason.
-                    rag = RAGIndex()
+                    rag = RAGIndex(embedder)
                     indexed = sum(rag.add_document(item["document_id"], item["text"], item["locator"], item["metadata"]) for item in rag_documents)
                     retrieved = rag.search(task.question)
                     rag_backend = f"in_memory_fallback:{type(exc).__name__}"
             else:
-                rag = RAGIndex()
+                rag = RAGIndex(embedder)
                 indexed = sum(rag.add_document(item["document_id"], item["text"], item["locator"], item["metadata"]) for item in rag_documents)
                 retrieved = rag.search(task.question)
         else:
@@ -102,7 +103,8 @@ class LiteratureAgent:
                 "backend": rag_backend,
                 "indexed_chunk_count": indexed,
                 "retrieved_chunks": [item.to_dict() for item in retrieved],
-                "embedding_model": "hashing-256-offline-baseline",
+                "embedding_model": embedding_model,
+                "embedding_configuration_error": embedding_error,
                 "retrieval_policy": "0.7 vector cosine + 0.3 lexical overlap; retrieved chunks remain unverified evidence candidates",
             },
             "literature_intelligence": intelligence,

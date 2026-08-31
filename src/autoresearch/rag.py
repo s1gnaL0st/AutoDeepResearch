@@ -46,6 +46,46 @@ class HashingEmbedder:
         return [value / norm for value in vector]
 
 
+class SentenceTransformerEmbedder:
+    """Optional local semantic embedder.
+
+    It is intentionally opt-in because model downloads are large and must be
+    approved by the operator.  The selected model must produce 256 dimensions
+    when used with the bundled pgvector schema (or be wrapped by a project
+    specific projection before indexing).
+    """
+
+    def __init__(self, model_name: str):
+        from sentence_transformers import SentenceTransformer
+        self.model_name = model_name
+        self._model = SentenceTransformer(model_name)
+        self.dimension = int(self._model.get_sentence_embedding_dimension())
+
+    def __call__(self, text: str) -> list[float]:
+        values = self._model.encode(text, normalize_embeddings=True)
+        return [float(value) for value in values]
+
+
+def configured_embedder() -> tuple[Callable[[str], list[float]], str, str | None]:
+    """Build the explicitly configured local embedder.
+
+    Returns ``(embedder, model_label, configuration_error)``.  No model is
+    downloaded implicitly: setting ``AUTORESEARCH_EMBEDDING_MODEL`` is the
+    operator's opt-in and the package must already be installed/cache-ready.
+    """
+    import os
+    model_name = os.environ.get("AUTORESEARCH_EMBEDDING_MODEL", "").strip()
+    if not model_name:
+        return HashingEmbedder(), "hashing-256-offline-baseline", None
+    try:
+        embedder = SentenceTransformerEmbedder(model_name)
+        if embedder.dimension != HashingEmbedder.dimension:
+            return HashingEmbedder(), f"hashing-256-fallback (requested {model_name}; dimension={embedder.dimension})", "configured embedding dimension must be 256 for the pgvector schema"
+        return embedder, model_name, None
+    except Exception as exc:
+        return HashingEmbedder(), f"hashing-256-fallback (requested {model_name})", f"{type(exc).__name__}: {exc}"
+
+
 @dataclass(frozen=True)
 class RetrievedChunk:
     chunk_id: str
@@ -113,14 +153,26 @@ class PostgresRAGStore:
             installed = bool(conn.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname='vector')").fetchone()[0])
             available = bool(conn.execute("SELECT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name='vector')").fetchone()[0])
             if available and not installed:
-                conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-                installed = True
+                # Extension installation requires database ownership/superuser
+                # privileges.  A failed attempt must be rolled back before
+                # issuing the normal schema statements on this connection.
+                try:
+                    conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+                    conn.commit()
+                    installed = True
+                except Exception:
+                    conn.rollback()
+                    installed = False
             self.vector_available = installed
             self.backend = "pgvector" if installed else "postgres_jsonb_compat"
             conn.execute("CREATE TABLE IF NOT EXISTS autoresearch_rag_chunks (chunk_id TEXT PRIMARY KEY, document_id TEXT NOT NULL, text TEXT NOT NULL, locator JSONB NOT NULL, embedding JSONB NOT NULL, metadata JSONB NOT NULL DEFAULT '{}'::jsonb)")
             conn.execute("CREATE INDEX IF NOT EXISTS autoresearch_rag_chunks_document_idx ON autoresearch_rag_chunks(document_id)")
             if installed:
                 conn.execute("ALTER TABLE autoresearch_rag_chunks ADD COLUMN IF NOT EXISTS embedding_vector vector(256)")
+                # Migrate chunks written by the JSONB compatibility backend.
+                # The stored array is deterministic and can be cast directly
+                # to pgvector without re-embedding documents.
+                conn.execute("UPDATE autoresearch_rag_chunks SET embedding_vector = (embedding::text)::vector WHERE embedding_vector IS NULL")
                 conn.execute("CREATE INDEX IF NOT EXISTS autoresearch_rag_chunks_hnsw_idx ON autoresearch_rag_chunks USING hnsw (embedding_vector vector_cosine_ops)")
 
     @staticmethod

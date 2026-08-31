@@ -21,6 +21,36 @@ Claude Code can be selected as the coding agent. Hypothesis, analysis, review an
 reporting remain deliberately conservative by default and still require domain
 evaluation suites and human scientific review.
 
+## RAG and PostgreSQL/pgvector
+
+When `AUTORESEARCH_DATABASE_URL` is set, full-text passages are chunked,
+embedded, and persisted in PostgreSQL. With the `vector` extension installed,
+the store uses a `vector(256)` column, HNSW cosine index, and a hybrid query
+(70% vector cosine + 30% PostgreSQL full-text score). Chunks created before the
+extension was enabled are automatically backfilled into the vector column.
+Without the extension the runtime reports `postgres_jsonb_compat` and performs
+the same deterministic scoring in Python; it never labels this as native
+pgvector.
+
+The default `hashing-256-offline-baseline` embedder is dependency-free and is
+intended for smoke tests. For a local semantic model, install
+`sentence-transformers` into the chosen environment and set
+`AUTORESEARCH_EMBEDDING_MODEL` to a cached 256-dimensional model. Model
+downloads are never implicit. If the package/model is unavailable or its
+dimension is not 256, the EvidenceSet records the configuration error and
+uses the explicit hashing fallback.
+
+Example PostgreSQL configuration (all paths may remain on a non-system drive):
+
+```powershell
+$env:AUTORESEARCH_DATABASE_URL = "postgresql://postgres:***@127.0.0.1:5432/autoresearch"
+```
+
+The extension itself must be installed by a PostgreSQL administrator. On
+Windows, place the compiled files under the PostgreSQL installation directory
+(for this project, `D:\PostgreSQL`) and then run `CREATE EXTENSION vector;`.
+The project does not install PostgreSQL, compilers, or models on `C:`.
+
 ## Run
 
 ```powershell
