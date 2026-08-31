@@ -1,5 +1,7 @@
 # AutoResearch
 
+![AutoDeepResearch console](docs/assets/research-console.png)
+
 Artifact-first orchestration core for reproducible end-to-end research.
 
 ## Current milestone: MVP-3

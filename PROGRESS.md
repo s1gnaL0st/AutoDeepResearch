@@ -1486,3 +1486,9 @@ project can be resumed without relying on chat history.
 - Recovery: Resubmitted that mission after restoring its Codex/DeerFlow profile
   and `objective_metric=auto`; the persisted dependency approval remains true
   and the replacement job entered `running`.
+
+## 2026-08-31 - README product preview
+
+- Added a real browser capture of the AutoDeepResearch console at
+  `docs/assets/research-console.png` and embedded it near the top of README.
+- Verified the screenshot contains no credentials or local workspace paths.
