@@ -1467,3 +1467,5 @@ project can be resumed without relying on chat history.
   during installation and execution, rather than retaining a stale gate.
 - Verification: Added an API regression test for the approval transition;
   complete test suite passes (`92 passed`).
+- Runtime: Restarted the local API on port 8090 so the console now serves the
+  updated dependency-gate behavior.

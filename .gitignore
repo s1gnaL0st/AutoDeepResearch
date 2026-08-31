@@ -1,4 +1,6 @@
 .autoresearch/
+api.log
+api.err.log
 .autoresearch-*/
 .deerflow-runtime/
 .final-smoke*/
