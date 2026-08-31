@@ -169,7 +169,18 @@ class ClaimEvidenceAgent:
         hypotheses = records.get("HypothesisSet")
         if evidence is None or hypotheses is None:
             return Artifact(kind="ClaimEvidenceMap", producer=self.name, inputs=message.input_artifacts, status="failed", payload={"error": "EvidenceSet and HypothesisSet are required"})
-        passages = evidence.get("payload", {}).get("full_text_passages", [])
+        evidence_payload = evidence.get("payload", {})
+        passages = list(evidence_payload.get("full_text_passages", []))
+        # RAG candidates are admissible retrieval evidence, but remain
+        # explicitly unverified.  Include them in lexical claim triage so a
+        # relevant retrieved chunk cannot be silently ignored downstream.
+        for passage in evidence_payload.get("rag", {}).get("retrieved_chunks", []):
+            if isinstance(passage, dict) and passage.get("text"):
+                passages.append({
+                    **passage,
+                    "support_status": "rag_candidate_unverified",
+                    "verification_scope": "rag_retrieved_chunk",
+                })
         maps = []
         for hypothesis in hypotheses.get("payload", {}).get("hypotheses", []):
             statement = hypothesis.get("statement") if isinstance(hypothesis, dict) else None
@@ -190,7 +201,7 @@ class ClaimEvidenceAgent:
                         "locator": passage.get("locator"),
                         "overlap_terms": overlap,
                         "score": len(overlap),
-                        "support_status": "lexical_candidate_unverified",
+                        "support_status": passage.get("support_status", "lexical_candidate_unverified"),
                         "verification_required": "human_entailment_and_citation_review",
                     })
             candidates.sort(key=lambda candidate: (-candidate["score"], str(candidate["passage_id"])))

@@ -41,6 +41,13 @@ class MvpTests(unittest.TestCase):
         hits = index.search("handwritten digit classification with kernels", top_k=1)
         self.assertEqual(hits[0].document_id, "paper-a")
         self.assertGreater(hits[0].lexical_score, 0)
+
+    def test_claim_mapper_includes_rag_candidates(self):
+        evidence = Artifact("EvidenceSet", {"full_text_passages": [], "rag": {"retrieved_chunks": [{"chunk_id": "c1", "document_id": "d1", "text": "The intervention improves transfer accuracy.", "locator": {"page": 2}}]}}, "literature")
+        hypotheses = Artifact("HypothesisSet", {"hypotheses": [{"id": "H1", "statement": "The intervention improves transfer accuracy"}]}, "hypothesis")
+        result = asyncio.run(ClaimEvidenceAgent().handle(A2AMessage("t", "control", "evidence", "map_claims_to_evidence", [evidence.artifact_id, hypotheses.artifact_id], [evidence.to_dict(), hypotheses.to_dict()]), ResearchTask("q")))
+        self.assertEqual(result.payload["summary"]["claims_with_lexical_candidates"], 1)
+        self.assertEqual(result.payload["claims"][0]["candidates"][0]["support_status"], "rag_candidate_unverified")
     def test_existing_experiment_is_auto_wired_when_workspace_is_configured(self):
         with tempfile.TemporaryDirectory() as root:
             with open(os.path.join(root, "experiment.py"), "w", encoding="utf-8") as handle:

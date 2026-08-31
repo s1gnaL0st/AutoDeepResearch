@@ -1432,3 +1432,10 @@ project can be resumed without relying on chat history.
 - Build: pgvector 0.8.6 compiled successfully with the D: drive MSVC toolchain;
   copying into the protected PostgreSQL installation requires an administrator
   UAC approval and was not completed in this session.
+
+## 2026-08-31 - RAG claim triage verification
+
+- Change: ClaimEvidenceAgent now includes retrieved RAG chunks in lexical claim
+  triage while preserving an explicit `rag_candidate_unverified` status.
+- Verification: Full test suite passes (`91 passed`). No dependencies or build
+  tools were installed on the C: drive.
