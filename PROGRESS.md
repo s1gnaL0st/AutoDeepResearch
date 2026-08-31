@@ -1397,3 +1397,16 @@ project can be resumed without relying on chat history.
 - Fix: The console launcher explicitly loads the user-scoped
   `AUTORESEARCH_DATABASE_URL` before spawning the API, preventing service
   restarts from silently falling back to the local JSON store.
+
+## 2026-08-31 - RAG module and pgvector readiness
+
+- Change: Added `src/autoresearch/rag.py` with deterministic chunking,
+  injectable embeddings, hybrid cosine/lexical retrieval, and PostgreSQL
+  persistence for indexed evidence chunks.
+- Change: LiteratureAgent now indexes full-text passages and exposes Top-K RAG
+  candidates inside `EvidenceSet`, preserving source locators and verification
+  boundaries.
+- Environment: pgvector source was downloaded, but this Windows host lacks the
+  MSVC Build Tools required to compile the PostgreSQL extension. The runtime
+  therefore reports `postgres_jsonb_compat` until `vector` is installed, rather
+  than claiming native vector search is active.

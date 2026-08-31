@@ -21,6 +21,7 @@ from autoresearch.compute import DockerComputeAgent, LocalComputeAgent, extract_
 from autoresearch.a2a import A2AAgentServer, A2AHttpAgent, A2AError
 from autoresearch.reproducibility import build_reproducibility_package
 from autoresearch.fulltext import extract_local_full_text
+from autoresearch.rag import RAGIndex, chunk_text
 from autoresearch.adjudication import build_evidence_adjudication
 from autoresearch.hypothesis import SubprocessHypothesisAgent
 from autoresearch.external_agents import SubprocessAnalysisAgent, SubprocessReviewerAgent
@@ -32,6 +33,14 @@ from autoresearch.agents import FakeAnalysisAgent, FakeCodingAgent, FakeComputeA
 
 
 class MvpTests(unittest.TestCase):
+    def test_rag_chunking_and_hybrid_retrieval(self):
+        self.assertGreaterEqual(len(chunk_text("signal " * 300, chunk_size=100, overlap=20)), 2)
+        index = RAGIndex()
+        index.add_document("paper-a", "Kernel methods improve handwritten digit classification accuracy.", {"type": "abstract"})
+        index.add_document("paper-b", "Marine biology observations describe coral reef growth.", {"type": "abstract"})
+        hits = index.search("handwritten digit classification with kernels", top_k=1)
+        self.assertEqual(hits[0].document_id, "paper-a")
+        self.assertGreater(hits[0].lexical_score, 0)
     def test_existing_experiment_is_auto_wired_when_workspace_is_configured(self):
         with tempfile.TemporaryDirectory() as root:
             with open(os.path.join(root, "experiment.py"), "w", encoding="utf-8") as handle:

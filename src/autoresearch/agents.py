@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import math
+import os
 import re
 import statistics
 
@@ -10,6 +11,7 @@ from .models import Artifact, ResearchTask
 from .protocol import A2AMessage
 from .literature import FixtureLiteratureSource, LiteratureSource, candidate_passages, deduplicate
 from .fulltext import extract_local_full_text
+from .rag import PostgresRAGStore, RAGIndex
 
 
 class FakeLiteratureAgent:
@@ -62,12 +64,47 @@ class LiteratureAgent:
                         "support_status": "candidate_unverified",
                         "verification_scope": "deerflow_full_text_excerpt",
                     })
+        rag_documents = [{
+            "document_id": passage.get("document_id") or passage.get("paper_key") or passage.get("passage_id"),
+            "text": passage.get("text", ""),
+            "locator": passage.get("locator", {}),
+            "metadata": {"source": passage.get("source"), "source_url": passage.get("source_url"), "passage_id": passage.get("passage_id")},
+        } for passage in fulltext_passages if isinstance(passage.get("text"), str) and passage["text"].strip()]
+        rag_backend = "in_memory"
+        if rag_documents:
+            dsn = os.environ.get("AUTORESEARCH_DATABASE_URL")
+            if dsn:
+                try:
+                    rag = PostgresRAGStore(dsn)
+                    indexed = rag.index_documents(rag_documents)
+                    retrieved = rag.search(task.question)
+                    rag_backend = "postgres_pgvector_ready" if getattr(rag, "vector_available", False) else "postgres_jsonb_compat"
+                except Exception as exc:
+                    # Retrieval must not make an otherwise valid literature
+                    # result fail; preserve the exact fallback reason.
+                    rag = RAGIndex()
+                    indexed = sum(rag.add_document(item["document_id"], item["text"], item["locator"], item["metadata"]) for item in rag_documents)
+                    retrieved = rag.search(task.question)
+                    rag_backend = f"in_memory_fallback:{type(exc).__name__}"
+            else:
+                rag = RAGIndex()
+                indexed = sum(rag.add_document(item["document_id"], item["text"], item["locator"], item["metadata"]) for item in rag_documents)
+                retrieved = rag.search(task.question)
+        else:
+            indexed, retrieved = 0, []
         return Artifact(kind="EvidenceSet", producer=self.name, payload={
             "query": task.question,
             "records": [record.to_dict() for record in records],
             "passages": passages,
             "full_text_documents": fulltext_documents,
             "full_text_passages": fulltext_passages,
+            "rag": {
+                "backend": rag_backend,
+                "indexed_chunk_count": indexed,
+                "retrieved_chunks": [item.to_dict() for item in retrieved],
+                "embedding_model": "hashing-256-offline-baseline",
+                "retrieval_policy": "0.7 vector cosine + 0.3 lexical overlap; retrieved chunks remain unverified evidence candidates",
+            },
             "literature_intelligence": intelligence,
             "source_snapshots": [result.snapshot() for result in results],
             "summary": {
@@ -78,6 +115,7 @@ class LiteratureAgent:
                 "candidate_passage_count": len(passages),
                 "full_text_document_count": len(fulltext_documents),
                 "full_text_passage_count": len(fulltext_passages),
+                "rag_retrieved_chunk_count": len(retrieved),
                 "metadata_verified_doi_count": sum(record.citation_status == "metadata_verified" and record.doi is not None for record in records),
                 "literature_intelligence_count": len(intelligence),
             },
