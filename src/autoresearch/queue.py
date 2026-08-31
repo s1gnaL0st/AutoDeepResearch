@@ -229,6 +229,12 @@ class BackgroundTaskRunner:
                     job.finished_at = _now()
                     task.execution_status = "failed"
                     task.error = error
+                    # Callback/profile failures can precede the workflow's
+                    # own exception handler. Do not leave an active stage
+                    # visible when the background job is already terminal.
+                    if task.state not in {ResearchState.FAILED, ResearchState.CANCELLED, ResearchState.REPORT_READY}:
+                        task.transition(ResearchState.FAILED)
+                        task.error = error
                     self._save(job, task)
         except TaskAlreadyQueued as exc:
             task = self.store.get_task(job.task_id)

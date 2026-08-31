@@ -1469,3 +1469,15 @@ project can be resumed without relying on chat history.
   complete test suite passes (`92 passed`).
 - Runtime: Restarted the local API on port 8090 so the console now serves the
   updated dependency-gate behavior.
+
+## 2026-08-31 - Active-stage pause and profile recovery
+
+- Change: The console enables pause for every non-terminal execution stage,
+  including `IMPLEMENTING`, rather than relying on a potentially stale job
+  status during a poll transition.
+- Change: Dependency approval no longer injects default iteration/replicate or
+  objective settings into an existing mission. Queue callback failures now
+  transition the task to `FAILED`, preventing a failed job from being rendered
+  as an active `IMPLEMENTING` mission.
+- Verification: Added regression coverage for profile callback failure and
+  custom objective dependency approval; complete test suite passes (`93 passed`).

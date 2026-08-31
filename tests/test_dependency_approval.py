@@ -92,7 +92,7 @@ def test_api_dependency_denial_keeps_task_resumable(tmp_path: Path) -> None:
 
 def test_api_dependency_approval_clears_visible_gate_before_queueing(tmp_path: Path) -> None:
     with ResearchApiServer(str(tmp_path)) as server:
-        task = ResearchTask("api dependency approval", state=ResearchState.AWAITING_DEPENDENCY_APPROVAL)
+        task = ResearchTask("api dependency approval", state=ResearchState.AWAITING_DEPENDENCY_APPROVAL, objective_metric="accuracy")
         task.execution_status = "awaiting_dependency_approval"
         task.runtime = {
             "phase": "awaiting_dependency_approval",

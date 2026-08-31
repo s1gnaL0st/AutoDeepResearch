@@ -1109,6 +1109,29 @@ class MvpTests(unittest.TestCase):
             self.assertEqual(current_task.state, ResearchState.REPORT_READY)
             self.assertEqual(current_task.attempt, 2)
 
+    def test_background_runner_marks_callback_profile_failure_as_failed(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = ArtifactStore(root)
+            task = ResearchTask("callback failure", state=ResearchState.IMPLEMENTING)
+            store.put_task(task)
+
+            def execute():
+                current = store.get_task(task.task_id)
+                current.error = "execution profile does not match"
+                return current
+
+            with BackgroundTaskRunner(store) as runner:
+                job = runner.submit(task.task_id, execute)
+                for _ in range(100):
+                    final_job = store.get_job(job.job_id)
+                    if final_job["status"] == "failed":
+                        break
+                    time.sleep(0.02)
+            current = store.get_task(task.task_id)
+            self.assertEqual(final_job["status"], "failed")
+            self.assertEqual(current.state, ResearchState.FAILED)
+            self.assertEqual(current.execution_status, "failed")
+
     def test_background_runner_recovers_orphaned_job_and_lock(self):
         with tempfile.TemporaryDirectory() as root:
             store = ArtifactStore(root)

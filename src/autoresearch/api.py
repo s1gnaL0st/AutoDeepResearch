@@ -400,6 +400,11 @@ class ResearchApiServer:
                             return
                         current_task = outer._runner.store.get_task(task_id)
                         if action == "resume" and (current_task.state == ResearchState.AWAITING_DEPENDENCY_APPROVAL or current_task.runtime.get("phase") == "awaiting_dependency_approval"):
+                            # Do not let omitted request fields inherit parser
+                            # defaults and override the mission objective.
+                            for field in ("iterations", "replicates", "objective_metric", "objective_direction"):
+                                if field not in body:
+                                    profile[field] = None
                             approved = body.get("approve_dependencies")
                             if not isinstance(approved, bool):
                                 raise ValueError("approve_dependencies must be boolean for a dependency gate")
