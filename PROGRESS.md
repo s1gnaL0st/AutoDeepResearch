@@ -1439,3 +1439,20 @@ project can be resumed without relying on chat history.
   triage while preserving an explicit `rag_candidate_unverified` status.
 - Verification: Full test suite passes (`91 passed`). No dependencies or build
   tools were installed on the C: drive.
+
+## 2026-08-31 - RAG production hardening
+
+- Change: pgvector bootstrap now rolls back safely when the database role lacks
+  extension-install permission, so normal RAG schema initialization can still
+  continue. When native pgvector is later enabled, prior JSONB embeddings are
+  backfilled into `embedding_vector` before the HNSW index is used.
+- Change: RAG now has an explicit optional SentenceTransformers configuration
+  (`AUTORESEARCH_EMBEDDING_MODEL`), records any loading/dimension error in the
+  EvidenceSet, and never downloads a model implicitly. The offline hashing
+  embedder remains an explicitly labelled fallback.
+- Documentation: Added PostgreSQL/pgvector and embedding setup notes to the
+  README. Changes are pushed to `origin/main` at `a47dae3`.
+- Environment: Administrator installation of the already-built pgvector files
+  into `D:\PostgreSQL` did not complete; `vector.dll` and `vector.control` are
+  still absent and the live backend correctly reports `postgres_jsonb_compat`.
+  No installation path on C: was used.
