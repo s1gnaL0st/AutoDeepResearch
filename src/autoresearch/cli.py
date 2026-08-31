@@ -303,7 +303,7 @@ async def resume_research(task_id: str, root: str, approve: bool = True, literat
         # A dependency-gated task may be resumed after an API restart or a
         # harmless adapter-default change. Keep the operator-approved runtime
         # context usable; explicit profile changes remain rejected elsewhere.
-        if task.runtime.get("phase") == "awaiting_dependency_approval" and task.runtime.get("dependency_approval") is True:
+        if task.runtime.get("phase") in {"awaiting_dependency_approval", "dependency_install_approved"} and task.runtime.get("dependency_approval") is True:
             task.execution_profile_hash = profile_hash
         else:
             raise ValueError("execution profile does not match the profile used to create this task")

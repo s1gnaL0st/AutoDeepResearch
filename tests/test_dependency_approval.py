@@ -9,6 +9,7 @@ from autoresearch.models import ResearchTask
 from autoresearch.protocol import A2AMessage
 from autoresearch.api import ResearchApiServer
 from autoresearch.models import ResearchState
+from autoresearch.queue import JobRecord
 from autoresearch.storage import ArtifactStore
 
 
@@ -87,3 +88,28 @@ def test_api_dependency_denial_keeps_task_resumable(tmp_path: Path) -> None:
     assert result["task"]["execution_status"] == "paused"
     assert "用户拒绝" in result["task"]["error"]
     assert result["paused"] is True
+
+
+def test_api_dependency_approval_clears_visible_gate_before_queueing(tmp_path: Path) -> None:
+    with ResearchApiServer(str(tmp_path)) as server:
+        task = ResearchTask("api dependency approval", state=ResearchState.AWAITING_DEPENDENCY_APPROVAL)
+        task.execution_status = "awaiting_dependency_approval"
+        task.runtime = {
+            "phase": "awaiting_dependency_approval",
+            "dependency_request": {"missing": ["torch"], "requirements_path": "requirements.txt"},
+        }
+        ArtifactStore(tmp_path).put_task(task)
+        # The HTTP action is under test, not background workflow execution.
+        server._runner.submit = lambda task_id, execute, max_attempts: JobRecord("queued-job", task_id)
+        request = Request(
+            server.base_url + f"/research/{task.task_id}/resume",
+            method="POST",
+            data=b'{"approve_dependencies": true}',
+            headers={"Content-Type": "application/json"},
+        )
+        with urlopen(request) as response:
+            result = json.loads(response.read())
+
+    assert result["task"]["state"] == ResearchState.IMPLEMENTING.value
+    assert result["task"]["runtime"]["dependency_approval"] is True
+    assert result["task"]["runtime"]["phase"] == "dependency_install_approved"

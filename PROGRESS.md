@@ -1458,3 +1458,12 @@ project can be resumed without relying on chat history.
   extension is enabled in `autoresearch`, and the live backend reports
   `pgvector`. A write/search smoke test passed and its temporary row was
   removed. No installation path on C: was used.
+
+## 2026-08-31 - Dependency gate control recovery
+
+- Change: approving a dependency-installation gate now immediately clears the
+  visible waiting phase before the worker is queued. The UI consequently
+  returns from `REVIEW DEPENDENCIES` to the normal `PAUSE`/`RESUME` control
+  during installation and execution, rather than retaining a stale gate.
+- Verification: Added an API regression test for the approval transition;
+  complete test suite passes (`92 passed`).

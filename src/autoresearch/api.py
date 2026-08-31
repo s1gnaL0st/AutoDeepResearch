@@ -417,6 +417,12 @@ class ResearchApiServer:
                                 self._send(200, {"task": _task_json(current_task), "dependency_request": request, "paused": True})
                                 return
                             current_task.error = None
+                            # Clear the visible dependency gate before the
+                            # background worker starts pip. Otherwise a UI
+                            # polling between approval and worker startup can
+                            # keep rendering the old "review dependencies"
+                            # action instead of the normal pause control.
+                            current_task.runtime["phase"] = "dependency_install_approved"
                             if current_task.state == ResearchState.AWAITING_DEPENDENCY_APPROVAL:
                                 current_task.transition(ResearchState.IMPLEMENTING)
                             current_task.execution_status = "not_queued"
