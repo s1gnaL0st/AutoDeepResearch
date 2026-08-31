@@ -1481,3 +1481,5 @@ project can be resumed without relying on chat history.
   as an active `IMPLEMENTING` mission.
 - Verification: Added regression coverage for profile callback failure and
   custom objective dependency approval; complete test suite passes (`93 passed`).
+- Recovery: Normalized the pre-existing failed Titanic mission from stale
+  `IMPLEMENTING` to `FAILED`; its artifacts and failure reason were retained.
