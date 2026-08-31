@@ -1410,3 +1410,15 @@ project can be resumed without relying on chat history.
   MSVC Build Tools required to compile the PostgreSQL extension. The runtime
   therefore reports `postgres_jsonb_compat` until `vector` is installed, rather
   than claiming native vector search is active.
+
+## 2026-08-31 - pgvector build attempt (D: drive)
+
+- Action: Downloaded pgvector source from GitHub codeload to
+  `F:\pgvector-src-20260831` and attempted a minimal Visual Studio Build Tools
+  installation with `D:\BuildTools` and `D:\BuildToolsCache` paths.
+- Result: The installer returned Windows exit code 87 and did not install the
+  toolchain; no C: drive installation was left running. PostgreSQL therefore
+  remains in explicit `postgres_jsonb_compat` mode until MSVC or a prebuilt
+  extension is supplied.
+- Verification: PostgreSQL RAG indexing and hybrid retrieval smoke test passed;
+  project test suite remains green (`90 passed`).
