@@ -1,6 +1,7 @@
 # AutoDeepResearch
 
 ![AutoDeepResearch console](docs/assets/research-console.png)
+![Uploading image.png…]()
 
 Artifact-first orchestration core for reproducible end-to-end research.
 
