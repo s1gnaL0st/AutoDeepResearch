@@ -17,7 +17,7 @@ The repository contains a zero-dependency local workflow with:
 - a source-snapshotting Crossref/arXiv literature Agent, plus an offline fixture source;
 - replaceable hypothesis, coding, compute, analysis, review and report agents;
 - a local append-only JSON store and CLI;
-- a loopback control-plane API with task-owned Artifact reads, bounded jobs and
+- a FastAPI/Uvicorn loopback control-plane API with task-owned Artifact reads, bounded jobs and
   cancellation-safe completion handling.
 
 Crossref/arXiv and DeepResearch-compatible sources are supported for retrieval;
@@ -398,5 +398,9 @@ Run it directly with:
 
 ```powershell
 $env:PYTHONPATH = "src"
-python -m autoresearch.api --store .autoresearch --port 8090
+python -m autoresearch.fastapi_server --store .autoresearch --port 8090
 ```
+
+The legacy `python -m autoresearch.api` entry point remains available for
+compatibility tests. The FastAPI facade preserves the same route and JSON
+contracts and exposes OpenAPI documentation at `/docs`.

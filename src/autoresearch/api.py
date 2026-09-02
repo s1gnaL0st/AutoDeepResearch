@@ -4,11 +4,15 @@ import asyncio
 import argparse
 import json
 import threading
+import urllib.error
+import urllib.request
 from dataclasses import asdict
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from .cli import resume_research, run_research, build_execution_profile, execution_profile_hash
 from .adjudication import build_evidence_adjudication
@@ -554,6 +558,88 @@ class ResearchApiServer:
 
     def __exit__(self, *args: object) -> None:
         self.close()
+
+
+def create_fastapi_app(root: str = ".autoresearch"):
+    """Create an ASGI facade while preserving the existing JSON API contract."""
+    from contextlib import asynccontextmanager
+    legacy: dict[str, ResearchApiServer] = {}
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        server = ResearchApiServer(root, host="127.0.0.1", port=0).start()
+        legacy["server"] = server
+        try:
+            yield
+        finally:
+            server.close()
+            legacy.clear()
+
+    app = FastAPI(title="AutoDeepResearch Control Plane", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type"],
+    )
+
+    async def proxy_request(path: str, request: Request):
+        server = legacy.get("server")
+        if server is None:
+            return Response(content='{"error":"server_starting"}', status_code=503, media_type="application/json")
+        target = f"{server.base_url}/{path}"
+        if request.url.query:
+            target += f"?{request.url.query}"
+        body = await request.body()
+        outgoing = urllib.request.Request(target, data=body or None, headers={"Content-Type": request.headers.get("content-type", "application/json")}, method=request.method)
+        try:
+            with urllib.request.urlopen(outgoing, timeout=3600) as upstream:
+                payload, status, content_type = upstream.read(), upstream.status, upstream.headers.get("Content-Type", "application/json")
+        except urllib.error.HTTPError as exc:
+            payload, status, content_type = exc.read(), exc.code, exc.headers.get("Content-Type", "application/json")
+        return Response(content=payload, status_code=status, media_type=content_type.split(";", 1)[0])
+
+    # Keep the public surface explicit for OpenAPI consumers while forwarding
+    # to the compatibility dispatcher during the incremental migration.
+    @app.get("/research", tags=["research"])
+    async def list_research(request: Request):
+        return await proxy_request("research", request)
+
+    @app.post("/research", tags=["research"])
+    async def create_research(request: Request):
+        return await proxy_request("research", request)
+
+    @app.get("/research/{task_id}", tags=["research"])
+    async def get_research(task_id: str, request: Request):
+        return await proxy_request(f"research/{task_id}", request)
+
+    @app.get("/research/{task_id}/status", tags=["research"])
+    async def get_status(task_id: str, request: Request):
+        return await proxy_request(f"research/{task_id}/status", request)
+
+    @app.get("/research/{task_id}/job", tags=["research"])
+    async def get_job(task_id: str, request: Request):
+        return await proxy_request(f"research/{task_id}/job", request)
+
+    @app.get("/research/{task_id}/artifacts", tags=["artifacts"])
+    async def list_artifacts(task_id: str, request: Request):
+        return await proxy_request(f"research/{task_id}/artifacts", request)
+
+    @app.get("/research/{task_id}/artifacts/{artifact_id}", tags=["artifacts"])
+    async def get_artifact(task_id: str, artifact_id: str, request: Request):
+        return await proxy_request(f"research/{task_id}/artifacts/{artifact_id}", request)
+
+    @app.post("/research/{task_id}/{action}", tags=["research"])
+    async def research_action(task_id: str, action: str, request: Request):
+        if action not in {"approve", "resume", "retry", "cancel", "pause", "delete", "adjudicate"}:
+            return Response(content='{"error":"not_found"}', status_code=404, media_type="application/json")
+        return await proxy_request(f"research/{task_id}/{action}", request)
+
+    @app.api_route("/{path:path}", methods=["GET", "POST", "OPTIONS"], include_in_schema=False)
+    async def fallback(path: str, request: Request):
+        return await proxy_request(path, request)
+
+    return app
 
 
 def main() -> None:

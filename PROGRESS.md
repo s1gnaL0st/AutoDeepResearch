@@ -1492,3 +1492,53 @@ project can be resumed without relying on chat history.
 - Added a real browser capture of the AutoDeepResearch console at
   `docs/assets/research-console.png` and embedded it near the top of README.
 - Verified the screenshot contains no credentials or local workspace paths.
+
+## 2026-09-01 - Project learning guide and resume calibration
+
+- Documentation: Added `docs/PROJECT_GUIDE.md` as a source-reading guide covering
+  the workflow, agents, compute boundary, RAG, persistence, A2A boundary, and
+  failure/retry paths.
+- Documentation: Added plain-language explanations of Agent Contract and
+  Artifact-first data modeling, including a Coding-to-Compute handoff example.
+- Resume guidance: Added a concise, evidence-bounded project entry and wording
+  notes so A2A, Docker, and internal contracts are not overstated.
+- Resume refinement: Kept the implemented Web console, adapter layer, Agent
+  Card, and remote Artifact interaction as a concrete extensibility achievement,
+  while describing A2A as an extension interface rather than native transport
+  for the local DeerFlow/Codex adapters.
+
+## 2026-09-01 - Isolate tests from production PostgreSQL missions
+
+- Diagnosis: The local test run inherited `AUTORESEARCH_DATABASE_URL`, so
+  temporary test stores were routed to the shared PostgreSQL database and
+  appeared in the Web console as 24 synthetic Mission rows.
+- Recovery: Removed the 25 clearly identified test missions created between
+  10:54 and 10:58 on 2026-09-01. The three pre-existing user missions were
+  preserved, as were all local Mission directories.
+- Fix: Added `tests/conftest.py` to remove the production database environment
+  variable during pytest startup, preventing future test data from entering the
+  live Mission database.
+- Verification: API listing now shows only the three original user missions.
+  Full pytest rerun was blocked by the local command approval/proxy policy;
+  no source behavior outside test isolation was changed.
+
+## 2026-09-01 - FastAPI/Uvicorn API migration
+
+- Change: Added `create_fastapi_app()` and a `autoresearch.fastapi_server`
+  Uvicorn entry point. The ASGI facade preserves the existing `/research`
+  route and JSON contracts while exposing OpenAPI at `/docs`.
+- Change: Updated `start_console.ps1`, packaging metadata, and README to use
+  FastAPI/Uvicorn by default. The standard-library server remains available as
+  a compatibility entry point for existing integration tests.
+- Design: The domain workflow, queue, persistence, and Artifact logic remain
+  unchanged; the migration replaces the HTTP serving boundary without moving
+  task data or changing API semantics.
+- Fix: FastAPI request type resolution now uses module-level imports, avoiding
+  local-annotation resolution as a query parameter under postponed annotations.
+- Fix: Added explicit loopback CORS origins for the static Web console, so
+  browser requests from port 5173 can load historical Missions through the
+  FastAPI service on port 8090.
+- Review follow-up: Converted the global test environment deletion into an
+  autouse pytest fixture with automatic restoration, and exposed the primary
+  FastAPI research/status/job/Artifact/action routes explicitly in OpenAPI;
+  unknown paths remain hidden behind a compatibility fallback during migration.

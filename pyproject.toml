@@ -7,10 +7,12 @@ name = "autoresearch"
 version = "0.1.0"
 description = "A reproducible, artifact-first AutoResearch orchestration core"
 requires-python = ">=3.11"
+dependencies = ["fastapi>=0.115", "uvicorn>=0.30"]
 
 [project.scripts]
 autoresearch = "autoresearch.cli:main"
 autoresearch-api = "autoresearch.api:main"
+autoresearch-fastapi = "autoresearch.fastapi_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
